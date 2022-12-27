@@ -1,0 +1,61 @@
+name: Build Verification
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - main
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    name: ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+        - {
+            name: "Windows / MSVC",
+            artifact: "Windows-MSVC.7z",
+            os: windows-latest,
+            cc: "cl",
+            cxx: "cl",
+            environment_script: "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat"
+          }
+        - {
+            name: "macOS / Clang",
+            artifact: "macOS.7z",
+            os: macos-latest,
+            cc: "clang",
+            cxx: "clang++"
+          }
+
+    steps:
+    - name: Info
+      run: |
+        cmake --version
+        cmake --help
+
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Environment Variables
+      uses: iamtheyammer/branch-env-vars@v1.2.1
+      with:
+        WITH_EXTRA_LIBS: |
+          !pr>main:ON
+          !default:OFF
+        WITH_PREBUILT_SHADERC: |
+          !pr>main:OFF
+          !default:ON
+
+    - name: Configure
+      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DWITH_CATCH2=${{env.WITH_EXTRA_LIBS}} -DWITH_FMT=${{env.WITH_EXTRA_LIBS}} -DWITH_GLEQ=${{env.WITH_EXTRA_LIBS}} -DWITH_IMGUI=${{env.WITH_EXTRA_LIBS}} -DWITH_LUAU=${{env.WITH_EXTRA_LIBS}} -DWITH_MESHOPT=${{env.WITH_EXTRA_LIBS}} -DWITH_STB=${{env.WITH_EXTRA_LIBS}} -DWITH_PREBUILT_SHADERC=${{env.WITH_PREBUILT_SHADERC}} -DWITH_SHADERC_LIBRARY=${{env.WITH_EXTRA_LIBS}}
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
