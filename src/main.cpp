@@ -159,7 +159,7 @@ static int run(int, char**)
 
     defer(bgfx::shutdown());
 
-    bgfx::setDebug(BGFX_DEBUG_STATS);
+    bgfx::setDebug(BGFX_DEBUG_NONE);
 
     // Graphics resources' creation --------------------------------------------
     bgfx::ShaderHandle vs = BGFX_INVALID_HANDLE;
@@ -209,14 +209,20 @@ static int run(int, char**)
     vertex_layout
         .begin()
         .add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
-        .add(bgfx::Attrib::Color0,   4, bgfx::AttribType::Float)
+        .add(bgfx::Attrib::Color0,   4, bgfx::AttribType::Uint8, true)
         .end();
 
-    const float vertices[] =
+    struct Vertex
     {
-        -0.6f, -0.4f, 0.0f,  1.0f, 0.0f, 0.0f, 1.0f,
-         0.6f, -0.4f, 0.0f,  0.0f, 1.0f, 0.0f, 1.0f,
-         0.0f,  0.6f, 0.0f,  0.0f, 0.0f, 1.0f, 1.0f,
+        glm::vec3 position;
+        uint32_t  color;
+    };
+
+    const Vertex vertices[] =
+    {
+        { {-0.6f, -0.4f, 0.0f}, 0xff0000ff },
+        { { 0.6f, -0.4f, 0.0f}, 0xff00ff00 },
+        { { 0.0f,  0.6f, 0.0f}, 0xffff0000 },
     };
     const bgfx::VertexBufferHandle vertex_buffer = bgfx::createVertexBuffer(
         bgfx::makeRef(vertices, sizeof(vertices)),
