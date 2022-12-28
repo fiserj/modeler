@@ -1,6 +1,8 @@
 set(NAME ${CMAKE_PROJECT_NAME})
 
-set(SOURCE_LIST "")
+set(SOURCE_LIST
+    imgui.cpp
+)
 
 if(APPLE)
     list(APPEND SOURCE_LIST main.mm)
@@ -8,46 +10,15 @@ else()
     list(APPEND SOURCE_LIST main.cpp)
 endif()
 
-set(LIBRARY_LIST
-    bgfx
-    glfw
-)
-
-if(WITH_FMT)
-    list(APPEND LIBRARY_LIST fmt)
-endif()
-
-if(WITH_GLEQ)
-    list(APPEND LIBRARY_LIST gleq)
-endif()
-
-if(WITH_IMGUI)
-    list(APPEND SOURCE_LIST imgui.cpp)
-    list(APPEND LIBRARY_LIST imgui)
-endif()
-
-if(WITH_LUAU)
-    list(APPEND LIBRARY_LIST Luau.CodeGen Luau.Compiler Luau.VM)
-endif()
-
-if(WITH_MESHOPT)
-    list(APPEND LIBRARY_LIST meshoptimizer)
-endif()
-
-if(WITH_STB)
-    list(APPEND LIBRARY_LIST stb)
-endif()
-
-if(WITH_SHADERC_LIBRARY)
-    list(APPEND LIBRARY_LIST shaderclib)
-endif()
-
 add_executable(${NAME}
     ${SOURCE_LIST}
 )
 
 target_link_libraries(${NAME} PRIVATE
-    ${LIBRARY_LIST}
+    bgfx
+    glfw
+    imgui
+    par
 )
 
 if(MSVC)
