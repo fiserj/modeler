@@ -1,7 +1,8 @@
 #pragma once
 
-#include <imgui.h>    // ImGui::*
-#include <ImGuizmo.h> // ImGuizmo::*
+#include <imgui.h>          // ImGui::*
+#include <imgui_internal.h> // ...
+#include <ImGuizmo.h>       // ImGuizmo::*
 
 struct GLFWwindow;
 

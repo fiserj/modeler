@@ -4,8 +4,9 @@
 #include <bgfx/embedded_shader.h>      // BGFX_EMBEDDED_SHADER
 
 #include <bx/bx.h>                     // BX_CONCATENATE
-#include <bx/math.h>                   // mtxOrtho, mtxRotateZ
+#include <bx/math.h>                   // mtxOrtho, mtxRotateZ, round
 #include <bx/platform.h>               // BX_PLATFORM_*
+#include <bx/string.h>                 // snprintf
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>                // glfw*
@@ -119,6 +120,103 @@ static CAMetalLayer* create_metal_layer(NSWindow* window)
 #endif
 
     return init;
+}
+
+
+// -----------------------------------------------------------------------------
+// EDITOR GUI
+// -----------------------------------------------------------------------------
+
+static ImVec4 update_editor_gui()
+{
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+
+    ImGui::PushStyleColor(ImGuiCol_Separator, ImVec4(0,0,0,0));
+
+    const ImGuiID dockspace_id   = ImGui::GetID("EditorDockSpace");
+    const bool    dockspace_init = ImGui::DockBuilderGetNode(dockspace_id);
+
+    // Like `ImGui::DockSpaceOverViewport`, but we need to know the ID upfront.
+    {
+        ImGui::SetNextWindowPos     (viewport->WorkPos );
+        ImGui::SetNextWindowSize    (viewport->WorkSize);
+        ImGui::SetNextWindowViewport(viewport->ID);
+
+        constexpr ImGuiWindowFlags window_flags =
+            ImGuiWindowFlags_NoBackground          |
+            ImGuiWindowFlags_NoBringToFrontOnFocus | 
+            ImGuiWindowFlags_NoCollapse            |
+            ImGuiWindowFlags_NoDocking             |
+            ImGuiWindowFlags_NoMove                |
+            ImGuiWindowFlags_NoNavFocus            |
+            ImGuiWindowFlags_NoResize              |
+            ImGuiWindowFlags_NoTitleBar            ;
+
+        constexpr ImGuiDockNodeFlags dockspace_flags =
+            ImGuiDockNodeFlags_NoWindowMenuButton  |
+            ImGuiDockNodeFlags_PassthruCentralNode ;
+
+        char label[32];
+        bx::snprintf(label, sizeof(label), "Viewport_%016x", viewport->ID);
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding  , 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding   , { 0.0f, 0.0f });
+
+        ImGui::Begin(label, nullptr, window_flags);
+
+        ImGui::PopStyleVar(3);
+
+        ImGui::DockSpace(dockspace_id, {}, dockspace_flags);
+
+        ImGui::End();
+    }
+
+    ImGui::PopStyleColor();
+
+    const char* window_name = "Modeler";
+
+    if (!dockspace_init)
+    {
+        ImGui::DockBuilderRemoveNode (dockspace_id);
+        ImGui::DockBuilderAddNode    (dockspace_id, ImGuiDockNodeFlags_DockSpace);
+        ImGui::DockBuilderSetNodeSize(dockspace_id, viewport->Size);
+
+        const ImGuiID dock_editor_id = ImGui::DockBuilderSplitNode(
+            dockspace_id, ImGuiDir_Right, 0.50f, nullptr, nullptr
+        );
+
+        ImGui::DockBuilderDockWindow(window_name, dock_editor_id);
+
+        ImGui::DockBuilderFinish(dockspace_id);
+    }
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 0.0f, 0.0f });
+    const bool editor_open = ImGui::Begin(window_name);
+    ImGui::PopStyleVar();
+
+    if (editor_open)
+    {
+        ImGui::PushMonospacedFont();
+        // TODO: Render soruce code editor.
+        ImGui::PopFont();
+    }
+    ImGui::End();
+
+    if (const ImGuiDockNode* node = ImGui::DockBuilderGetCentralNode(dockspace_id))
+    {
+        const ImVec2 dpi = ImGui::GetIO().DisplayFramebufferScale;
+
+        return
+        {
+            bx::round(dpi.x * node->Pos .x),
+            bx::round(dpi.y * node->Pos .y),
+            bx::round(dpi.x * node->Size.x),
+            bx::round(dpi.y * node->Size.y),
+        };
+    }
+
+    return {};
 }
 
 
@@ -244,12 +342,7 @@ static int run(int, char**)
 
         // Update ImGui.
         imgui_begin_frame();
-        
-        if (ImGui::Begin("Controls"))
-        {
-            ImGui::TextUnformatted("TODO");
-        }
-        ImGui::End();
+        const ImVec4 avail_viewport = update_editor_gui();
 
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS && !ImGui::GetIO().WantCaptureKeyboard)
         {
@@ -272,9 +365,15 @@ static int run(int, char**)
 
         // Set projection transform for the view.
         {
-            bgfx::setViewRect(0, 0, 0, uint16_t(width), uint16_t(height));
+            bgfx::setViewRect(
+                0,
+                uint16_t(avail_viewport.x),
+                uint16_t(avail_viewport.y),
+                uint16_t(avail_viewport.z),
+                uint16_t(avail_viewport.w)
+            );
 
-            const float aspect = float(width) / float(height);
+            const float aspect = avail_viewport.z / avail_viewport.w;
             float proj[16];
             bx::mtxOrtho(proj, -aspect, aspect, -1.0f, 1.0f, 1.0f, -1.0f, 0.0f, bgfx::getCaps()->homogeneousDepth);
 
