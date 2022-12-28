@@ -51,6 +51,10 @@ if(PREBUILT_SHADERC_AVAILABLE)
     add_custom_target(shaderc
         DEPENDS ${SHADERC_TOOL_OUTPUT_BINARY}
     )
+
+    set_target_properties(shaderc PROPERTIES
+        FOLDER "Third Party"
+    )
 endif()
 
 if(NOT PREBUILT_SHADERC_AVAILABLE OR WITH_SHADERC_LIBRARY)

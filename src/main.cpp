@@ -22,9 +22,9 @@
 #endif
 #include <GLFW/glfw3native.h>             // glfwGetX11Display, glfwGet*Window
 
-#ifdef WITH_IMGUI
-#   include "imgui.h"                     // imgui_*, ImGui::*
-#endif
+#include <glm/glm.hpp>                    // glm::*
+
+#include "imgui.h"                        // imgui_*, ImGui::*, ImGuizmo::*
 
 #if BX_PLATFORM_OSX
 #   import <Cocoa/Cocoa.h>                // NSWindow
@@ -226,13 +226,9 @@ static int run(int, char**)
 
     bgfx::setViewClear(0 , BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0x303030ff, 1.0f, 0);
 
-#ifdef WITH_IMGUI
     // ImGui setup -------------------------------------------------------------
     imgui_init(window, bgfx::getCaps()->limits.maxViews - 1);
     defer(imgui_shutdown());
-
-    bool show_imgui_demo_window = true;
-#endif
 
     // Program loop ------------------------------------------------------------
     while (!glfwWindowShouldClose(window))
@@ -240,21 +236,16 @@ static int run(int, char**)
         // Update inputs.
         glfwPollEvents();
 
-        bool imgui_wants_keyboard = false;
-
-#ifdef WITH_IMGUI
         // Update ImGui.
         imgui_begin_frame();
-
-        if (show_imgui_demo_window)
+        
+        if (ImGui::Begin("Controls"))
         {
-            ImGui::ShowDemoWindow(&show_imgui_demo_window);
+            ImGui::TextUnformatted("TODO");
         }
+        ImGui::End();
 
-        imgui_wants_keyboard = ImGui::GetIO().WantCaptureKeyboard;
-#endif
- 
-        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS && !imgui_wants_keyboard)
+        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS && !ImGui::GetIO().WantCaptureKeyboard)
         {
             break;
         }
@@ -298,10 +289,8 @@ static int run(int, char**)
             bgfx::submit(0, program);
         }
 
-#ifdef WITH_IMGUI
         // Render and submit ImGui.
         imgui_end_frame();
-#endif
 
         // Submit recorded rendering operations.
         bgfx::frame();

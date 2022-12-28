@@ -16,9 +16,11 @@ add_executable(${NAME}
 
 target_link_libraries(${NAME} PRIVATE
     bgfx
+    bx
     glfw
+    glm
     imgui
-    par
+    imguizmo
 )
 
 if(MSVC)

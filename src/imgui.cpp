@@ -142,6 +142,8 @@ void imgui_begin_frame()
 
     ImGui::NewFrame();
     ImGui::PushFont(font_ctx->frame_fonts->base);
+
+    ImGuizmo::BeginFrame();
 }
 
 void imgui_end_frame()

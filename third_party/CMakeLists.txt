@@ -118,17 +118,30 @@ set_target_properties(
 # DEAR IMGUI
 # ------------------------------------------------------------------------------
 
-if(WITH_IMGUI)
-    FetchContent_Declare(
-        imgui
-        GIT_REPOSITORY https://github.com/ocornut/imgui.git
-        GIT_TAG        69beaa1d0b7fc8f4b448dcf1780b08cfc959da65 # docking branch
-    )
+FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG        69beaa1d0b7fc8f4b448dcf1780b08cfc959da65 # docking branch
+)
 
-    FetchContent_Populate(imgui)
+FetchContent_Populate(imgui)
 
-    include(cmake/imgui.cmake)
-endif()
+include(cmake/imgui.cmake)
+
+
+# ------------------------------------------------------------------------------
+# IMGUIZMO
+# ------------------------------------------------------------------------------
+
+FetchContent_Declare(
+    imguizmo
+    GIT_REPOSITORY https://github.com/CedricGuillemet/ImGuizmo.git
+    GIT_TAG        da4a6eea57e8b59db34e9198a901ba8631fb40e4
+)
+
+FetchContent_Populate(imguizmo)
+
+include(cmake/imguizmo.cmake)
 
 
 # ------------------------------------------------------------------------------
@@ -146,6 +159,21 @@ if(WITH_GLEQ)
 
     include(cmake/gleq.cmake)
 endif()
+
+
+# ------------------------------------------------------------------------------
+# GLM
+# ------------------------------------------------------------------------------
+
+FetchContent_Declare(
+    glm
+    GIT_REPOSITORY https://github.com/g-truc/glm.git
+    GIT_TAG        fc8f4bb442b9540969f2f3f351c4960d91bca17a
+)
+
+FetchContent_MakeAvailable(glm)
+
+# include(cmake/par.cmake)
 
 
 # ------------------------------------------------------------------------------
@@ -193,21 +221,6 @@ if(WITH_MESHOPT)
 
     include(cmake/meshoptimizer.cmake)
 endif()
-
-
-# ------------------------------------------------------------------------------
-# PAR
-# ------------------------------------------------------------------------------
-
-FetchContent_Declare(
-    par
-    GIT_REPOSITORY https://github.com/prideout/par.git
-    GIT_TAG        24f26c12926b746db5814de759163144ad79843a
-)
-
-FetchContent_Populate(par)
-
-include(cmake/par.cmake)
 
 
 # ------------------------------------------------------------------------------
