@@ -15,6 +15,7 @@ add_executable(${NAME}
 )
 
 target_link_libraries(${NAME} PRIVATE
+    arcball_camera
     bgfx
     bx
     glfw

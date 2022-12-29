@@ -238,3 +238,18 @@ if(WITH_STB)
 
     include(cmake/stb.cmake)
 endif()
+
+
+# ------------------------------------------------------------------------------
+# ARCBALL CAMERA
+# ------------------------------------------------------------------------------
+
+FetchContent_Declare(
+    arcball_camera
+    GIT_REPOSITORY https://github.com/nlguillemot/arcball_camera.git
+    GIT_TAG        4d77b69779f9d717c4a84d79c1ea20680366fe40
+)
+
+FetchContent_Populate(arcball_camera)
+
+include(cmake/arcball_camera.cmake)

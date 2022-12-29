@@ -24,6 +24,11 @@
 #include <GLFW/glfw3native.h>             // glfwGetX11Display, glfwGet*Window
 
 #include <glm/glm.hpp>                    // glm::*
+#include <glm/gtc/matrix_transform.hpp>   // lookAt
+#include <glm/gtc/type_ptr.hpp>           // value_ptr
+
+#define ARCBALL_CAMERA_IMPLEMENTATION
+#include <arcball_camera.h>               // arcball_camera_update
 
 #include "imgui.h"                        // imgui_*, ImGui::*, ImGuizmo::*
 
@@ -92,7 +97,7 @@ static CAMetalLayer* create_metal_layer(NSWindow* window)
 
 #endif // BX_PLATFORM_OSX
 
-[[maybe_unused]] static bgfx::Init create_bgfx_init(GLFWwindow* window)
+static bgfx::Init create_bgfx_init(GLFWwindow* window)
 {
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
@@ -124,9 +129,76 @@ static CAMetalLayer* create_metal_layer(NSWindow* window)
 
 
 // -----------------------------------------------------------------------------
+// EDITOR CAMERA
+// -----------------------------------------------------------------------------
+
+struct ArcballUpdateData
+{
+    ImVec4 viewport        = {};
+    ImVec2 position_old    = {};
+    ImVec2 position_new    = {};
+    float  time_delta      = 0.0f;
+    float  zoom_delta      = 0.0f;
+    bool   panning_active  = false;
+    bool   rotation_active = false;
+};
+
+struct ArcballControls
+{
+    glm::mat4 view_matrix    = glm::mat4(1.0f);
+
+    glm::vec3 eye            = { 1.0f, 0.0f, 0.0f };
+    glm::vec3 target         = { 0.0f, 0.0f, 0.0f };
+    glm::vec3 up             = { 0.0f, 0.0f, 0.0f };
+
+    float     zoom_per_tick  = 0.1f;
+    float     pan_speed      = 0.5f;
+    float     rotation_mult  = 3.0f;
+
+    bool      allow_rotation = true;
+    bool      allow_panning  = true;
+    bool      allow_zooming  = true;
+
+    void update(const ArcballUpdateData& data)
+    {
+        if (up == glm::vec3(0.0f))
+        {
+            const glm::vec3 look     = glm::normalize(target - eye);
+            const glm::vec3 world_up = { 0.0f, 1.0f, 0.0f };
+
+            up = glm::normalize(glm::cross(glm::cross(look, world_up), look));
+        }
+
+        arcball_camera_update
+        (
+            glm::value_ptr(eye),
+            glm::value_ptr(target),
+            glm::value_ptr(up),
+            nullptr,
+            data.time_delta,
+            zoom_per_tick,
+            pan_speed,
+            rotation_mult,
+            data.viewport.z,
+            data.viewport.w,
+            data.position_old.x - data.viewport.x, data.position_new.x - data.viewport.x,
+            data.position_old.y - data.viewport.y, data.position_new.y - data.viewport.y,
+            data.panning_active && allow_panning,
+            data.rotation_active && allow_rotation,
+            data.zoom_delta * allow_zooming,
+            0 // Flags.
+        );
+
+        view_matrix = glm::lookAt(eye, target, up);
+    }
+};
+
+
+// -----------------------------------------------------------------------------
 // EDITOR GUI
 // -----------------------------------------------------------------------------
 
+// Returns remaining available viewport area.
 static ImVec4 update_editor_gui()
 {
     ImGuiViewport* viewport = ImGui::GetMainViewport();
@@ -183,7 +255,7 @@ static ImVec4 update_editor_gui()
         ImGui::DockBuilderSetNodeSize(dockspace_id, viewport->Size);
 
         const ImGuiID dock_editor_id = ImGui::DockBuilderSplitNode(
-            dockspace_id, ImGuiDir_Right, 0.50f, nullptr, nullptr
+            dockspace_id, ImGuiDir_Right, 0.35f, nullptr, nullptr
         );
 
         ImGui::DockBuilderDockWindow(window_name, dock_editor_id);
@@ -198,22 +270,22 @@ static ImVec4 update_editor_gui()
     if (editor_open)
     {
         ImGui::PushMonospacedFont();
+
         // TODO: Render soruce code editor.
+        ImGui::TextUnformatted("TODO...");
+        
         ImGui::PopFont();
     }
     ImGui::End();
 
+    if (!dockspace_init)
+    {
+        ImGui::SetNavWindow(nullptr);
+    }
+
     if (const ImGuiDockNode* node = ImGui::DockBuilderGetCentralNode(dockspace_id))
     {
-        const ImVec2 dpi = ImGui::GetIO().DisplayFramebufferScale;
-
-        return
-        {
-            bx::round(dpi.x * node->Pos .x),
-            bx::round(dpi.y * node->Pos .y),
-            bx::round(dpi.x * node->Size.x),
-            bx::round(dpi.y * node->Size.y),
-        };
+        return { node->Pos.x, node->Pos.y, node->Size.x, node->Size.y };
     }
 
     return {};
@@ -334,6 +406,12 @@ static int run(int, char**)
     imgui_init(window, bgfx::getCaps()->limits.maxViews - 1);
     defer(imgui_shutdown());
 
+    ArcballControls camera =
+    {
+        .eye    = { 0.0f, 0.0f, 2.0f },
+        .target = { 0.0f, 0.0f, 0.0f },
+    };
+
     // Program loop ------------------------------------------------------------
     while (!glfwWindowShouldClose(window))
     {
@@ -344,7 +422,29 @@ static int run(int, char**)
         imgui_begin_frame();
         const ImVec4 avail_viewport = update_editor_gui();
 
-        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS && !ImGui::GetIO().WantCaptureKeyboard)
+        // Update camera.
+        {
+            const  ImVec2 position_new = ImGui::GetMousePos();
+            static ImVec2 position_old = position_new;
+
+            // TODO: Make more restrictive. 
+            const bool panning_active  = ImGui::IsMouseDown(ImGuiMouseButton_Right);
+            const bool rotation_active = ImGui::IsMouseDown(ImGuiMouseButton_Left );
+
+            camera.update({
+                .viewport        = avail_viewport,
+                .position_old    = position_old,
+                .position_new    = position_new,
+                .time_delta      = ImGui::GetIO().DeltaTime,
+                .zoom_delta      = ImGui::GetIO().MouseWheel,
+                .panning_active  = panning_active,
+                .rotation_active = rotation_active,
+            });
+
+            position_old = position_new;
+        }
+
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape) && !ImGui::GetIO().WantCaptureKeyboard)
         {
             break;
         }
@@ -365,29 +465,29 @@ static int run(int, char**)
 
         // Set projection transform for the view.
         {
+            const ImVec2 dpi = ImGui::GetIO().DisplayFramebufferScale;
             bgfx::setViewRect(
                 0,
-                uint16_t(avail_viewport.x),
-                uint16_t(avail_viewport.y),
-                uint16_t(avail_viewport.z),
-                uint16_t(avail_viewport.w)
+                uint16_t(bx::round(dpi.x * avail_viewport.x)),
+                uint16_t(bx::round(dpi.y * avail_viewport.y)),
+                uint16_t(bx::round(dpi.x * avail_viewport.z)),
+                uint16_t(bx::round(dpi.y * avail_viewport.w))
             );
 
-            const float aspect = avail_viewport.z / avail_viewport.w;
-            float proj[16];
-            bx::mtxOrtho(proj, -aspect, aspect, -1.0f, 1.0f, 1.0f, -1.0f, 0.0f, bgfx::getCaps()->homogeneousDepth);
+            const float     aspect = avail_viewport.z / avail_viewport.w;
+            const glm::mat4 proj   = glm::perspective(glm::radians(60.0f), aspect, 0.1f, 100.0f);
 
-            bgfx::setViewTransform(0, nullptr, proj);
+            bgfx::setViewTransform(0, glm::value_ptr(camera.view_matrix), glm::value_ptr(proj));
 
             bgfx::touch(0);
         }
 
         // Submit the triangle data.
         {
-            float transform[16];
-            bx::mtxRotateZ(transform, float(glfwGetTime()));
+            // float transform[16];
+            // bx::mtxRotateZ(transform, float(glfwGetTime()));
 
-            bgfx::setTransform(transform);
+            // bgfx::setTransform(transform);
             bgfx::setVertexBuffer(0, vertex_buffer); // NOTE : No index buffer.
             bgfx::setState(BGFX_STATE_DEFAULT);
 
